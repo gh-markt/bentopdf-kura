@@ -10,6 +10,7 @@ cert/
 corpus/
 
 pdfa-engine/build*/
+/build-validation/
 pdfa-engine/third_party/
 
 dist/

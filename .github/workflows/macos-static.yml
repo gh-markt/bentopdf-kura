@@ -44,7 +44,7 @@ jobs:
           key: pdfium-mac-arm64-${{ env.PDFIUM_BRANCH }}-${{ hashFiles('pdfa-engine/scripts/pdfium/*') }}
 
       - name: Install engine dependencies
-        run: brew install cmake ninja qpdf freetype openjpeg jpeg-turbo libpng little-cms2 openssl@3
+        run: brew install cmake ninja qpdf freetype openjpeg jpeg-turbo libpng little-cms2 openssl@3 expat
 
       - name: Configure and build
         working-directory: pdfa-engine
@@ -52,7 +52,7 @@ jobs:
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DPDFA_STATIC_DEPS=ON \
-            -DCMAKE_PREFIX_PATH="$(brew --prefix)"
+            -DCMAKE_PREFIX_PATH="$(brew --prefix);$(brew --prefix expat)"
           cmake --build build --target kura kura_sdk
 
       - name: Assert the binary is self-contained

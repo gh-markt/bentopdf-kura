@@ -4,7 +4,7 @@
 kura --check --level 2b in.pdf
 ```
 
-Check mode runs the entire detection pipeline against a document, writes nothing, and reports what would have to change for the input to conform. It is the same engine and the same passes as a conversion, with the output discarded.
+Check mode runs the entire detection pipeline against a document, writes nothing, and reports what would have to change for the input to conform. It uses the conversion engine with output discarded, plus checks on the original metadata before conversion replaces it.
 
 ```json
 {"file":"in.pdf","ok":true,"level":"2b","engine":"BentoPDF Kura Engine 1.1.0",
@@ -13,7 +13,7 @@ Check mode runs the entire detection pipeline against a document, writes nothing
   {"code":"FONT_SUBSTITUTED","detail":"embedded LiberationSans as substitute for /Helvetica","fixed":true}]}
 ```
 
-`compliant` is true when the document already conforms. `findings` counts the repairs a conversion would make, and `issues` lists them. Exit status is 0 when compliant, 1 when there are findings, and 2 when the file cannot be read at all, so it drops into a shell pipeline like any other preflight tool.
+`compliant` is true when the implemented checks find no defects; this is not a conformance certificate. `findings` counts the repairs a conversion would make, and `issues` lists them. Exit status is 0 when compliant, 1 when there are findings, and 2 when processing fails, including unreadable files or invalid content operators, so it drops into a shell pipeline like any other preflight tool.
 
 ## What counts as a finding
 
@@ -21,12 +21,29 @@ A finding is a repair the converter would apply, minus the three normalizations 
 
 Findings marked `(visual risk)` are repairs that need `--allow-visual-risk` on a real conversion.
 
+## Additional validation
+
+Original XMP is parsed with Expat before rebuilding metadata. Namespace-expanded
+identification properties may use attributes or element values and alternate
+prefixes. Malformed XML, missing required metadata, incorrect identification,
+DOCTYPE declarations and packets exceeding size/depth bounds produce findings.
+Legacy PDF/X-1a and PDF/X-3 may omit XMP.
+
+Undefined content operators are rejected outside balanced `BX`/`EX` compatibility
+sections. The scan covers pages and reachable form, tiling pattern, Type3 glyph
+and annotation appearance streams, with bounded resource traversal. It does not
+validate every operator's operand types or execution context.
+
+PDF/VT checks validate reachable document-part parent/child relationships, cycles,
+shared children, leaf page ranges and page ownership. Conversion rebuilds invalid
+trees. This is not a complete PDF/VT schema validator.
+
 ## What it cannot see
 
-Check mode sees exactly what the converter can repair. That has a consequence worth stating plainly:
+The inherited conversion checks still have limitations. Upstream reported the following baseline measurements before these patches:
 
-- It never reports a false finding. Measured against veraPDF over 568 PDF/A-1b files it agrees on every one, and over 970 PDF/A-2b files it agrees on 954.
-- It is blind to any defect the converter itself does not know how to fix. Every one of the 16 disagreements above is a file veraPDF rejects that Kura does not know how to repair.
+- Measured against veraPDF over 568 PDF/A-1b files it agrees on every one, and over 970 PDF/A-2b files it agrees on 954.
+- The original checker missed defects the converter did not know how to fix. Every one of the 16 disagreements above is a file veraPDF rejects that Kura does not know how to repair.
 
 If a pass could not finish, because a content stream or metadata packet could not be read, the report carries a `SCAN_INCOMPLETE` finding rather than staying silent. Treat it as "unknown", not "clean".
 
@@ -38,7 +55,7 @@ So: use check mode as a preflight, to decide whether a document needs conversion
 
 ## Idempotence
 
-Converting a document and then checking the result always reports `compliant: true` with zero findings. This is asserted in the project's test lanes for every level.
+Conversion followed by checking is tested for the supported levels. These tests demonstrate consistency of implemented checks, not independent standards conformance.
 
 ## In the other surfaces
 

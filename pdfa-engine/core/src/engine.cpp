@@ -370,6 +370,13 @@ Result convert(const unsigned char* data, std::size_t size, const Options& optIn
     if (!opt.preflightProfile.empty()) passProfile(ctx, data, size);
     if (!opt.profileFixOps.empty() && !opt.verifyOnly) passProfileFixups(ctx);
     lap("analyze");
+    if (opt.verifyOnly) {
+      checkOriginalMetadata(ctx);
+    }
+    checkContentOperators(ctx);
+    if (ctx.failed()) {
+      return res;
+    }
     passStructure(ctx);
     lap("structure");
     if (!ctx.failed()) passPages(ctx);

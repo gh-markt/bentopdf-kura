@@ -437,6 +437,36 @@ void appendSeq(std::string& xmp, const std::string& tag, const std::string& valu
 }
 }
 
+std::vector<std::pair<std::string, std::string>> metadataIdentifiers(Ctx& ctx) {
+  const std::string separator(1, '\x1f');
+  std::vector<std::pair<std::string, std::string>> identifiers;
+  if (ctx.isA()) {
+    const std::string schema = "http://www.aiim.org/pdfa/ns/id/" + separator;
+    identifiers.emplace_back(schema + "part", std::to_string(ctx.part));
+    if (ctx.part >= 4) {
+      identifiers.emplace_back(schema + "rev", "2020");
+    }
+    if (ctx.conf != 0) {
+      identifiers.emplace_back(schema + "conformance", std::string(1, ctx.conf));
+    }
+  }
+  if (ctx.isX()) {
+    if (!ctx.pdf14Target()) {
+      identifiers.emplace_back("http://www.npes.org/pdfx/ns/id/" + separator +
+                                   "GTS_PDFXVersion", xVersionString(ctx));
+    }
+  }
+  if (ctx.isVT()) {
+    identifiers.emplace_back("http://www.npes.org/pdfvt/ns/id/" + separator +
+                                 "GTS_PDFVTVersion", vtVersionString(ctx));
+  }
+  if (ctx.isE()) {
+    identifiers.emplace_back("http://www.aiim.org/pdfe/ns/id/" + separator +
+                                 "ISO_PDFEVersion", "PDF/E-1");
+  }
+  return identifiers;
+}
+
 void passMetadata(Ctx& ctx) {
   QPDFObjGen rootGen = ctx.pdf.getRoot().getObjGen();
   int stripped = 0;

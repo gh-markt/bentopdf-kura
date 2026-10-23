@@ -6,7 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- Check original XMP before conversion regenerates it: parse namespace-aware XML
+  with Expat, reject malformed packets, and validate required identification.
+- Reject undefined content operators outside balanced compatibility sections,
+  including reachable form, pattern, Type3 and annotation appearance streams.
+- Validate existing PDF/VT document-part parent/child relationships, cycles and
+  leaf page ownership before retaining them; rebuild invalid trees on conversion.
+
 ### Added
+
+- 49 standalone validation regression cases, including positive controls and all
+  13 previously missed defects in the Vellum audit, plus Ubuntu Release CI with
+  checksum-pinned QPDF 12.4.2. Expat is now a build dependency.
 
 - The CLI's output path is optional: left out, the result is written next to
   the input as `<input>.<level>.pdf` (`-ua` appended with `--ua`), and the

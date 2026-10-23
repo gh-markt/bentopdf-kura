@@ -1,4 +1,18 @@
 set(PDFA_TP ${CMAKE_CURRENT_SOURCE_DIR}/../third_party)
+if(PDFA_STATIC_DEPS)
+  set(EXPAT_USE_STATIC_LIBS TRUE)
+  if(UNIX)
+    set(_kura_library_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
+    set(CMAKE_FIND_LIBRARY_SUFFIXES .a)
+  endif()
+endif()
+find_package(EXPAT REQUIRED)
+if(PDFA_STATIC_DEPS AND UNIX)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES ${_kura_library_suffixes})
+  if(NOT EXPAT_LIBRARY MATCHES "\\.a$")
+    message(FATAL_ERROR "PDFA_STATIC_DEPS requires static Expat; use a fresh build directory or set EXPAT_LIBRARY")
+  endif()
+endif()
 
 if(NOT EMSCRIPTEN)
   find_package(qpdf CONFIG REQUIRED)
@@ -15,6 +29,9 @@ endif()
 
 add_library(pdfa_core STATIC
   src/engine.cpp
+  src/metadata_check.cc
+  src/content_check.cc
+  src/dpart_check.cc
   src/analyze.cpp
   src/outline.cpp
   src/profile.cpp
@@ -51,6 +68,10 @@ target_include_directories(pdfa_core
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
 )
+target_link_libraries(pdfa_core PRIVATE EXPAT::EXPAT)
+if(PDFA_STATIC_DEPS)
+  target_compile_definitions(pdfa_core PRIVATE XML_STATIC)
+endif()
 
 if(WIN32)
   get_filename_component(PDFA_WIN_LIBDIR "${LCMS2_LIBRARY}" DIRECTORY)

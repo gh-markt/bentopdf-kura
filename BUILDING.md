@@ -8,13 +8,13 @@ verifying the binaries yourself.
 ## The native engine
 
 You need a C++17 compiler, CMake 3.20 or newer, and these libraries with their
-headers: qpdf 12, FreeType, OpenJPEG 2, libjpeg, libpng, zlib and Little CMS.
+headers: qpdf 12, FreeType, OpenJPEG 2, libjpeg, libpng, zlib, Little CMS and Expat (XML parsing).
 OpenSSL is optional and enables `--sign`.
 
 macOS:
 
 ```bash
-brew install cmake qpdf freetype openjpeg jpeg-turbo libpng little-cms2 openssl@3
+brew install cmake qpdf freetype openjpeg jpeg-turbo libpng little-cms2 openssl@3 expat
 cmake -S pdfa-engine -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ```
@@ -23,7 +23,7 @@ Debian and Ubuntu ship qpdf 11, so build qpdf 12 from source first:
 
 ```bash
 sudo apt-get install -y cmake g++ ninja-build pkg-config zlib1g-dev \
-  libjpeg-dev libfreetype-dev libpng-dev libopenjp2-7-dev liblcms2-dev libssl-dev
+  libjpeg-dev libfreetype-dev libpng-dev libopenjp2-7-dev liblcms2-dev libssl-dev libexpat1-dev
 curl -sSL https://github.com/qpdf/qpdf/releases/download/v12.3.2/qpdf-12.3.2.tar.gz | tar -xz -C /tmp
 cmake -S /tmp/qpdf-12.3.2 -B /tmp/qpdf-build -G Ninja -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF -DREQUIRE_CRYPTO_OPENSSL=ON -DUSE_IMPLICIT_CRYPTO=OFF \
@@ -117,3 +117,26 @@ cmake -S pdfa-engine -B build-asan -DPDFA_BUILD_FUZZ=ON -DPDFA_WITH_PDFIUM=OFF \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 cmake --build build-asan
 ```
+
+## Validation regression tests
+
+Expat is a system build dependency; use the installed development headers and
+library on Slackware, `libexpat1-dev` on Ubuntu, `expat` through Homebrew, or
+`expat:x64-windows-static` through vcpkg. Static builds require a static Expat
+archive. The WASM builder prepares its own checksum-pinned Expat.
+
+The standalone regression suite creates its own PDFs in memory. For a focused
+checker build without PDFium:
+
+```bash
+cmake -S pdfa-engine -B build-validation -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" \
+  -DPDFA_WITH_PDFIUM=OFF
+cmake --build build-validation --parallel 2
+ctest --test-dir build-validation --output-on-failure
+```
+
+Set `CMAKE_PREFIX_PATH` to the chosen QPDF installation when needed. The
+validation workflow builds checksum-pinned QPDF 12.4.2. Disabling PDFium here
+limits this test profile to checker behavior; release binaries must retain the
+raster functionality and follow the PDFium packaging instructions above.

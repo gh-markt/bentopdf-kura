@@ -160,17 +160,12 @@ void buildDPartTree(Ctx& ctx) {
   {
     QPDFObjectHandle existing = ctx.pdf.getRoot().getKey("/DPartRoot");
     if (existing.isDictionary() && existing.getKey("/DPartRootNode").isDictionary()) {
-      bool paged = true;
-      for (auto& ph : pages) {
-        if (!ph.getObjectHandle().getKey("/DPart").isDictionary()) {
-          paged = false;
-          break;
-        }
-      }
-      if (paged) {
+      std::string reason;
+      if (validDPartTree(ctx, reason)) {
         ctx.issue("VT_DPART_PRESENT", "kept existing document part hierarchy", false);
         return;
       }
+      ctx.issue("VT_DPART_INVALID", reason + "; rebuilding document part hierarchy", true);
     }
   }
   std::vector<std::pair<int, int>> records;

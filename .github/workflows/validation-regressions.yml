@@ -1,0 +1,33 @@
+name: Validation regressions
+on:
+  push:
+    branches: [main, vellum-validation-1.2.1]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  checker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install checker build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential cmake ninja-build curl ca-certificates pkg-config libexpat1-dev libfreetype-dev libopenjp2-7-dev libjpeg-dev libpng-dev zlib1g-dev liblcms2-dev libssl-dev libbz2-dev
+      - name: Build checksum-pinned QPDF 12.4.2
+        run: |
+          curl --fail --location --retry 2 https://github.com/qpdf/qpdf/releases/download/v12.4.2/qpdf-12.4.2.tar.gz -o "$RUNNER_TEMP/qpdf.tar.gz"
+          printf '%s  %s\n' 8a58af5b6141319287c1883bec8bd1bd545b7567b7fc5e6ce5d25a1c85f36397 "$RUNNER_TEMP/qpdf.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/qpdf.tar.gz" -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/qpdf-12.4.2" -B "$RUNNER_TEMP/qpdf-build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DREQUIRE_CRYPTO_OPENSSL=ON -DUSE_IMPLICIT_CRYPTO=OFF -DBUILD_DOC=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TESTING=OFF -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qpdf-install"
+          cmake --build "$RUNNER_TEMP/qpdf-build" --target libqpdf --parallel 2
+          cmake --install "$RUNNER_TEMP/qpdf-build" --component dev
+          cmake --install "$RUNNER_TEMP/qpdf-build" --component lib
+      - name: Build checker and regression tests
+        run: |
+          cmake -S pdfa-engine -B build-validation -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_FLAGS_RELEASE="-O3 -DNDEBUG" -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/qpdf-install" -DPDFA_WITH_PDFIUM=OFF
+          cmake --build build-validation --parallel 2
+      - name: Run checker regressions
+        run: ctest --test-dir build-validation --parallel 2 --output-on-failure

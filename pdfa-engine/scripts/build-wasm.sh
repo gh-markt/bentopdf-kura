@@ -6,6 +6,7 @@ TP="$ENGINE/third_party"
 QPDF_VERSION=12.3.2
 OPENJPEG_VERSION=2.5.4
 LCMS2_VERSION=2.16
+EXPAT_VERSION=2.9.0
 JOBS="${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}"
 
 command -v emcmake >/dev/null 2>&1 || { echo "emscripten is not on PATH (emcmake not found)" >&2; exit 1; }
@@ -64,9 +65,24 @@ if [ ! -f "$TP/build-lcms2-wasm/src/liblcms2.a" ]; then
 fi
 
 echo "==> building the engine"
+if [ ! -f "$TP/install-expat-wasm/lib/libexpat.a" ]; then
+  fetch "https://github.com/libexpat/libexpat/releases/download/R_2_9_0/expat-${EXPAT_VERSION}.tar.xz" "$TP/expat.tar.xz"
+  printf '%s  %s\n' '1e6371862cc31999b368c3b89b49994f0677e1bab5f1b2b85ae3741f5d803051' "$TP/expat.tar.xz" | sha256sum -c -
+  [ -d "$TP/expat-${EXPAT_VERSION}" ] || tar -xJf "$TP/expat.tar.xz" -C "$TP"
+  emcmake cmake -S "$TP/expat-${EXPAT_VERSION}" -B "$TP/build-expat-wasm" \
+    -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+    -DEXPAT_BUILD_DOCS=OFF -DEXPAT_BUILD_EXAMPLES=OFF -DEXPAT_BUILD_TESTS=OFF \
+    -DEXPAT_BUILD_TOOLS=OFF -DEXPAT_DTD=OFF \
+    -DCMAKE_INSTALL_PREFIX="$TP/install-expat-wasm"
+  cmake --build "$TP/build-expat-wasm" -j"$JOBS"
+  cmake --install "$TP/build-expat-wasm"
+fi
+
 emcmake cmake -S "$ENGINE" -B "$ENGINE/build-wasm" \
   -DCMAKE_BUILD_TYPE=Release \
-  -DPDFA_BUILD_CLI=OFF -DPDFA_BUILD_SDK=OFF -DPDFA_BUILD_FUZZ=OFF >/dev/null
+  -DPDFA_BUILD_CLI=OFF -DPDFA_BUILD_SDK=OFF -DPDFA_BUILD_FUZZ=OFF \
+  -DEXPAT_INCLUDE_DIR="$TP/install-expat-wasm/include" \
+  -DEXPAT_LIBRARY="$TP/install-expat-wasm/lib/libexpat.a" >/dev/null
 cmake --build "$ENGINE/build-wasm" --target pdfa_wasm -j"$JOBS"
 
 ls -la "$ENGINE/build-wasm/wasm/kura.js" "$ENGINE/build-wasm/wasm/kura.wasm"

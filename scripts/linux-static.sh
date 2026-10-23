@@ -15,7 +15,7 @@ packages() {
   DEBIAN_FRONTEND=noninteractive $SUDO apt-get install -y --no-install-recommends \
     libglib2.0-dev clang lld gdb cmake ninja-build pkg-config make \
     zlib1g-dev libjpeg-dev libfreetype-dev libpng-dev libopenjp2-7-dev \
-    liblcms2-dev libssl-dev libbz2-dev qpdf \
+    liblcms2-dev libssl-dev libbz2-dev libexpat1-dev qpdf \
     git curl ca-certificates python3 xz-utils lsb-release file
 }
 
