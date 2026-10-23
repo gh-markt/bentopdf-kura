@@ -56,48 +56,47 @@ class TestDocument {
  public:
   explicit TestDocument(pdfa::Level level = pdfa::Level::A2B)
       : bytes(baseline(level)),
-        context{this->document,
-                this->options,
-                this->result,
+        context{document,
+                options,
+                result,
                 pdfa::levelPart(level),
                 pdfa::levelConformance(level),
                 pdfa::levelFamily(level)} {
-    this->options.level = level;
-    this->options.verifyOnly = true;
-    this->document.processMemoryFile("control", reinterpret_cast<const char*>(this->bytes.data()),
-                                     this->bytes.size());
+    options.level = level;
+    options.verifyOnly = true;
+    document.processMemoryFile("control", reinterpret_cast<const char*>(bytes.data()),
+                               bytes.size());
   }
 
-  QPDF& pdf() { return this->document; }
-  pdfa::Ctx& ctx() { return this->context; }
-  QPDFObjectHandle root() { return this->document.getRoot(); }
-  QPDFObjectHandle metadata() { return this->root().getKey("/Metadata"); }
+  QPDF& pdf() { return document; }
+  pdfa::Ctx& ctx() { return context; }
+  QPDFObjectHandle root() { return document.getRoot(); }
+  QPDFObjectHandle metadata() { return root().getKey("/Metadata"); }
   QPDFObjectHandle page(size_t index = 0) {
-    return QPDFPageDocumentHelper(this->document).getAllPages().at(index).getObjectHandle();
+    return QPDFPageDocumentHelper(document).getAllPages().at(index).getObjectHandle();
   }
   std::string xml() {
-    const auto buffer = this->metadata().getStreamData(qpdf_dl_all);
+    const auto buffer = metadata().getStreamData(qpdf_dl_all);
     return {reinterpret_cast<const char*>(buffer->getBuffer()), buffer->getSize()};
   }
   void xml(const std::string& value) {
-    this->metadata().replaceStreamData(value, QPDFObjectHandle::newNull(),
-                                       QPDFObjectHandle::newNull());
+    metadata().replaceStreamData(value, QPDFObjectHandle::newNull(), QPDFObjectHandle::newNull());
   }
   void content(const std::string& value) {
-    this->page().replaceKey("/Contents", QPDFObjectHandle::newStream(&this->document, value));
+    page().replaceKey("/Contents", QPDFObjectHandle::newStream(&document, value));
   }
   bool hasIssue(const std::string& code) const {
     const auto matches = [&code](const pdfa::Issue& issue) { return issue.code == code; };
-    return std::any_of(this->result.issues.begin(), this->result.issues.end(), matches);
+    return std::any_of(result.issues.begin(), result.issues.end(), matches);
   }
-  bool findings() const { return !this->result.issues.empty(); }
+  bool findings() const { return !result.issues.empty(); }
   pdfa::Result check() {
-    const auto source = serialize(this->document);
-    return pdfa::convert(source.data(), source.size(), this->options);
+    const auto source = serialize(document);
+    return pdfa::convert(source.data(), source.size(), options);
   }
   pdfa::Result convert() {
-    const auto source = serialize(this->document);
-    auto conversion = this->options;
+    const auto source = serialize(document);
+    auto conversion = options;
     conversion.verifyOnly = false;
     return pdfa::convert(source.data(), source.size(), conversion);
   }
@@ -359,7 +358,7 @@ void integrationCase(const std::string& name) {
     expect(!result.ok || !result.compliant, "checker accepted a known-invalid input");
   }
 }
-}  // namespace
+}
 
 int main(int argc, char** argv) {
   if (argc != 2) {

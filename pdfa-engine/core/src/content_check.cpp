@@ -11,42 +11,42 @@ namespace {
 class OperatorScanner : public QPDFObjectHandle::ParserCallbacks {
  public:
   void handleObject(QPDFObjectHandle object, size_t, size_t) override {
-    if (!object.isOperator() || !this->error.empty()) {
+    if (!object.isOperator() || !error.empty()) {
       return;
     }
     const std::string operation = object.getOperatorValue();
     if (operation == "BX") {
-      if (++this->compatibilityDepth > kMaxContentNest) {
-        this->error = "compatibility section nesting exceeds the content limit";
+      if (++compatibilityDepth > kMaxContentNest) {
+        error = "compatibility section nesting exceeds the content limit";
       }
     } else if (operation == "EX") {
-      if (this->compatibilityDepth == 0) {
-        this->error = "EX without a matching BX";
+      if (compatibilityDepth == 0) {
+        error = "EX without a matching BX";
       } else {
-        --this->compatibilityDepth;
+        --compatibilityDepth;
       }
-    } else if (this->compatibilityDepth == 0 && knownOperators.count(operation) == 0) {
-      this->error = "undefined content operator: " + operation;
+    } else if (compatibilityDepth == 0 && knownOperators.count(operation) == 0) {
+      error = "undefined content operator: " + operation;
     }
-    if (!this->error.empty()) {
-      this->terminateParsing();
+    if (!error.empty()) {
+      terminateParsing();
     }
   }
 
   void contentSize(size_t size) override {
     if (size > kMaxInflateBytes) {
-      this->error = "decoded content exceeds the content size limit";
-      this->terminateParsing();
+      error = "decoded content exceeds the content size limit";
+      terminateParsing();
     }
   }
 
   void handleEOF() override {
-    if (this->compatibilityDepth != 0 && this->error.empty()) {
-      this->error = "BX without a matching EX";
+    if (compatibilityDepth != 0 && error.empty()) {
+      error = "BX without a matching EX";
     }
   }
 
-  std::string message() const { return this->error; }
+  std::string message() const { return error; }
 
  private:
   inline static const std::set<std::string> knownOperators{
@@ -68,10 +68,10 @@ class ContentChecker {
     try {
       page.parseContents(&scanner);
       if (!scanner.message().empty()) {
-        this->context.fatal("CONTENT_OPERATOR_INVALID", scanner.message());
+        context.fatal("CONTENT_OPERATOR_INVALID", scanner.message());
         return;
       }
-      this->resources(page.getAttribute("/Resources", true), 0);
+      resources(page.getAttribute("/Resources", true), 0);
       auto annotations = page.getObjectHandle().getKey("/Annots");
       if (annotations.isArray()) {
         for (int index = 0; index < annotations.getArrayNItems(); ++index) {
@@ -82,10 +82,10 @@ class ContentChecker {
               for (const auto& name : appearances.getKeys()) {
                 auto appearance = appearances.getKey(name);
                 if (appearance.isStream()) {
-                  this->stream(appearance, 0);
+                  stream(appearance, 0);
                 } else if (appearance.isDictionary()) {
                   for (const auto& state : appearance.getKeys()) {
-                    this->stream(appearance.getKey(state), 0);
+                    stream(appearance.getKey(state), 0);
                   }
                 }
               }
@@ -94,70 +94,69 @@ class ContentChecker {
         }
       }
     } catch (const std::exception& exception) {
-      this->context.fatal("CONTENT_SCAN_FAILED", exception.what());
+      context.fatal("CONTENT_SCAN_FAILED", exception.what());
     }
   }
 
  private:
   void stream(QPDFObjectHandle content, int depth) {
-    if (this->context.failed() || !content.isStream()) {
+    if (context.failed() || !content.isStream()) {
       return;
     }
-    if (depth > kMaxResourceNest || this->streams.size() >= 250000) {
-      this->context.fatal("CONTENT_SCAN_LIMIT", "content resource traversal limit exceeded");
+    if (depth > kMaxResourceNest || streams.size() >= 250000) {
+      context.fatal("CONTENT_SCAN_LIMIT", "content resource traversal limit exceeded");
       return;
     }
-    if (content.isIndirect() && !this->streams.insert(content.getObjGen()).second) {
+    if (content.isIndirect() && !streams.insert(content.getObjGen()).second) {
       return;
     }
     OperatorScanner scanner;
     QPDFObjectHandle::parseContentStream(content, &scanner);
     if (!scanner.message().empty()) {
-      this->context.fatal("CONTENT_OPERATOR_INVALID", scanner.message());
+      context.fatal("CONTENT_OPERATOR_INVALID", scanner.message());
       return;
     }
-    this->resources(content.getDict().getKey("/Resources"), depth + 1);
+    resources(content.getDict().getKey("/Resources"), depth + 1);
   }
 
-  void resources(QPDFObjectHandle resources, int depth) {
-    if (this->context.failed() || !resources.isDictionary()) {
+  void resources(QPDFObjectHandle dictionary, int depth) {
+    if (context.failed() || !dictionary.isDictionary()) {
       return;
     }
     if (depth > kMaxResourceNest) {
-      this->context.fatal("CONTENT_SCAN_LIMIT", "content resource nesting limit exceeded");
+      context.fatal("CONTENT_SCAN_LIMIT", "content resource nesting limit exceeded");
       return;
     }
-    if (resources.isIndirect() &&
-        !this->resourceDictionaries.insert(resources.getObjGen()).second) {
+    if (dictionary.isIndirect() && !resourceDictionaries.insert(dictionary.getObjGen()).second) {
       return;
     }
     for (const std::string category : {"/XObject", "/Pattern"}) {
-      auto entries = resources.getKey(category);
+      auto entries = dictionary.getKey(category);
       if (entries.isDictionary()) {
         for (const auto& name : entries.getKeys()) {
           auto entry = entries.getKey(name);
           if (entry.isStream() && (nameIs(entry.getDict().getKey("/Subtype"), "/Form") ||
                                    entry.getDict().getKey("/PatternType").isInteger())) {
-            this->stream(entry, depth);
+            stream(entry, depth);
           }
         }
       }
     }
-    auto fonts = resources.getKey("/Font");
-    if (fonts.isDictionary()) {
-      for (const auto& name : fonts.getKeys()) {
-        auto font = fonts.getKey(name);
+    auto fontResources = dictionary.getKey("/Font");
+    if (fontResources.isDictionary()) {
+      for (const auto& name : fontResources.getKeys()) {
+        auto font = fontResources.getKey(name);
         if (font.isDictionary() && nameIs(font.getKey("/Subtype"), "/Type3")) {
-          if (font.isIndirect() && !this->fonts.insert(font.getObjGen()).second) {
+          if (font.isIndirect() && !fonts.insert(font.getObjGen()).second) {
             continue;
           }
           auto characters = font.getKey("/CharProcs");
           if (characters.isDictionary()) {
             for (const auto& character : characters.getKeys()) {
-              this->stream(characters.getKey(character), depth);
+              stream(characters.getKey(character), depth);
             }
           }
-          this->resources(font.getKey("/Resources"), depth + 1);
+          resources(font.getKey("/Resources"), depth + 1);
         }
       }
     }
@@ -168,7 +167,7 @@ class ContentChecker {
   std::set<QPDFObjGen> resourceDictionaries;
   std::set<QPDFObjGen> fonts;
 };
-}  // namespace
+}
 
 void checkContentOperators(Ctx& ctx) {
   ContentChecker checker(ctx);
@@ -179,4 +178,4 @@ void checkContentOperators(Ctx& ctx) {
     }
   }
 }
-}  // namespace pdfa
+}

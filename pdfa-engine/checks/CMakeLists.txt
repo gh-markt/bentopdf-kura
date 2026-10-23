@@ -1,4 +1,4 @@
-add_executable(test_validation validation.cc)
+add_executable(test_validation validation.cpp)
 target_link_libraries(test_validation PRIVATE pdfa_core)
 target_include_directories(test_validation PRIVATE ../core/src)
 foreach(case IN ITEMS

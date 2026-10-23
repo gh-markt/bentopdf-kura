@@ -39,43 +39,41 @@ class MetadataParser : public Pipeline {
  public:
   explicit MetadataParser(const std::vector<std::pair<std::string, std::string>>& identifiers)
       : Pipeline("original XMP", nullptr), parser(XML_ParserCreateNS("UTF-8", '\x1f')) {
-    if (!this->parser) {
+    if (!parser) {
       throw std::runtime_error("could not create XML parser");
     }
     for (const auto& identifier : identifiers) {
-      this->values.emplace(identifier.first, std::vector<std::string>{});
+      values.emplace(identifier.first, std::vector<std::string>{});
     }
-    XML_SetUserData(this->parser, this);
-    XML_SetElementHandler(this->parser, &MetadataParser::start, &MetadataParser::end);
-    XML_SetCharacterDataHandler(this->parser, &MetadataParser::characters);
-    XML_SetStartDoctypeDeclHandler(this->parser, &MetadataParser::doctype);
-    XML_SetXmlDeclHandler(this->parser, &MetadataParser::declaration);
-    XML_SetParamEntityParsing(this->parser, XML_PARAM_ENTITY_PARSING_NEVER);
+    XML_SetUserData(parser, this);
+    XML_SetElementHandler(parser, &MetadataParser::start, &MetadataParser::end);
+    XML_SetCharacterDataHandler(parser, &MetadataParser::characters);
+    XML_SetStartDoctypeDeclHandler(parser, &MetadataParser::doctype);
+    XML_SetXmlDeclHandler(parser, &MetadataParser::declaration);
+    XML_SetParamEntityParsing(parser, XML_PARAM_ENTITY_PARSING_NEVER);
   }
 
-  ~MetadataParser() override { XML_ParserFree(this->parser); }
+  ~MetadataParser() override { XML_ParserFree(parser); }
 
   void write(const unsigned char* data, size_t length) override {
-    if (length > kMaxXmpBytes - this->bytes) {
+    if (length > kMaxXmpBytes - bytes) {
       throw std::runtime_error("original XMP exceeds the metadata size limit");
     }
-    this->bytes += length;
-    if (XML_Parse(this->parser, reinterpret_cast<const char*>(data), static_cast<int>(length),
+    bytes += length;
+    if (XML_Parse(parser, reinterpret_cast<const char*>(data), static_cast<int>(length),
                   XML_FALSE) != XML_STATUS_OK) {
-      throw std::runtime_error(this->error.empty() ? XML_ErrorString(XML_GetErrorCode(this->parser))
-                                                   : this->error);
+      throw std::runtime_error(error.empty() ? XML_ErrorString(XML_GetErrorCode(parser)) : error);
     }
   }
 
   void finish() override {
-    if (XML_Parse(this->parser, nullptr, 0, XML_TRUE) != XML_STATUS_OK) {
-      throw std::runtime_error(this->error.empty() ? XML_ErrorString(XML_GetErrorCode(this->parser))
-                                                   : this->error);
+    if (XML_Parse(parser, nullptr, 0, XML_TRUE) != XML_STATUS_OK) {
+      throw std::runtime_error(error.empty() ? XML_ErrorString(XML_GetErrorCode(parser)) : error);
     }
   }
 
   bool matches(const std::pair<std::string, std::string>& expected) const {
-    const auto& actual = this->values.at(expected.first);
+    const auto& actual = values.at(expected.first);
     if (actual.size() != 1) {
       return false;
     }
@@ -168,15 +166,15 @@ class MetadataParser : public Pipeline {
   }
 
   void stop(const std::string& message) {
-    this->error = message;
-    XML_StopParser(this->parser, XML_FALSE);
+    error = message;
+    XML_StopParser(parser, XML_FALSE);
   }
 
   void record(const std::string& name, const std::string& value) {
-    const auto found = this->values.find(name);
-    if (found != this->values.end()) {
+    const auto found = values.find(name);
+    if (found != values.end()) {
       if (found->second.size() >= 2) {
-        this->stop("duplicate XMP identification properties");
+        stop("duplicate XMP identification properties");
       } else {
         found->second.push_back(xmlTrim(value));
       }
@@ -189,7 +187,7 @@ class MetadataParser : public Pipeline {
   std::string error;
   size_t bytes = 0;
 };
-}  // namespace
+}
 
 void checkOriginalMetadata(Ctx& ctx) {
   auto metadata = ctx.pdf.getRoot().getKey("/Metadata");
@@ -223,4 +221,4 @@ void checkOriginalMetadata(Ctx& ctx) {
     ctx.issue("XMP_INVALID", std::string("original XMP is invalid: ") + exception.what(), true);
   }
 }
-}  // namespace pdfa
+}

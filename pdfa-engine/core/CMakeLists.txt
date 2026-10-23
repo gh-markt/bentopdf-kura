@@ -29,9 +29,9 @@ endif()
 
 add_library(pdfa_core STATIC
   src/engine.cpp
-  src/metadata_check.cc
-  src/content_check.cc
-  src/dpart_check.cc
+  src/metadata_check.cpp
+  src/content_check.cpp
+  src/dpart_check.cpp
   src/analyze.cpp
   src/outline.cpp
   src/profile.cpp

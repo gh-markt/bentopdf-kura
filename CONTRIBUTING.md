@@ -20,7 +20,7 @@ make check        # shell syntax, YAML, version lock, wasm smoke test
 ```
 
 `make build` needs a C++17 compiler, CMake, qpdf 12, FreeType, OpenJPEG,
-libjpeg, zlib and Little CMS. On macOS every one is in Homebrew; on Debian and
+libjpeg, zlib, Little CMS and Expat. On macOS every one is in Homebrew; on Debian and
 Ubuntu build qpdf 12 from source, as the CI workflows do, because the
 distribution ships qpdf 11. The full instructions, including PDFium and the
 WebAssembly build, are in [BUILDING.md](BUILDING.md).
